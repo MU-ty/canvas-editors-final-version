@@ -298,13 +298,13 @@ function App() {
       return;
     }
     try {
-      const { dataUrl, width, height } = await canvasViewRef.current.exportSelection({
+      const { dataUrl, pixelWidth, pixelHeight } = await canvasViewRef.current.exportSelection({
         format: 'image/png',
         padding: 32,
       });
-      console.log('Export PDF result', { width, height });
-      const safeWidth = Math.max(1, Math.round(width));
-      const safeHeight = Math.max(1, Math.round(height));
+      console.log('Export PDF result', { pixelWidth, pixelHeight });
+      const safeWidth = Math.max(1, Math.round(pixelWidth));
+      const safeHeight = Math.max(1, Math.round(pixelHeight));
       const pdf = new jsPDF({
         unit: 'px',
         format: [safeWidth, safeHeight],
