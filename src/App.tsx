@@ -298,19 +298,64 @@ function App() {
       return;
     }
     try {
-      const { dataUrl, pixelWidth, pixelHeight } = await canvasViewRef.current.exportSelection({
-        format: 'image/png',
+      // 第1步：先导出成 JPG（高质量）
+      const jpgExport = await canvasViewRef.current.exportSelection({
+        format: 'image/jpeg',
+        quality: 0.95,
+        background: '#ffffff',
         padding: 32,
       });
-      console.log('Export PDF result', { pixelWidth, pixelHeight });
-      const safeWidth = Math.max(1, Math.round(pixelWidth));
-      const safeHeight = Math.max(1, Math.round(pixelHeight));
-      const pdf = new jsPDF({
-        unit: 'px',
-        format: [safeWidth, safeHeight],
-      });
-      pdf.addImage(dataUrl, 'PNG', 0, 0, safeWidth, safeHeight);
-      pdf.save(`canvas-selection-${Date.now()}.pdf`);
+
+      const { dataUrl: jpgDataUrl } = jpgExport;
+      
+      // 第2步：从 dataUrl 创建一个临时 image，获取真实的像素尺寸
+      const img = new Image();
+      img.onload = () => {
+        const imgPixelWidth = img.width;
+        const imgPixelHeight = img.height;
+        const aspectRatio = imgPixelWidth / imgPixelHeight;
+        
+        console.log('Original image dimensions:', { imgPixelWidth, imgPixelHeight, aspectRatio });
+
+        // 第3步：计算适应 A4 的最佳尺寸
+        // A4 纸张：210mm x 297mm，留 10mm 边距
+        const a4Width = 210;   // mm
+        const a4Height = 297;  // mm
+        const margin = 10;     // mm
+        const contentWidth = a4Width - margin * 2;
+        const contentHeight = a4Height - margin * 2;
+
+        let pdfWidth = contentWidth;
+        let pdfHeight = contentWidth / aspectRatio;
+
+        // 如果高度超过可用高度，按高度缩放
+        if (pdfHeight > contentHeight) {
+          pdfHeight = contentHeight;
+          pdfWidth = contentHeight * aspectRatio;
+        }
+
+        // 计算图片在页面上的位置（居中）
+        const imgX = (a4Width - pdfWidth) / 2;
+        const imgY = (a4Height - pdfHeight) / 2;
+
+        console.log('Scaled for PDF:', { pdfWidth, pdfHeight, imgX, imgY });
+
+        // 创建 PDF，使用 A4 纸张大小
+        const pdf = new jsPDF({
+          unit: 'mm',
+          format: 'a4',
+        });
+
+        // 将 JPG 图片放置到 PDF 页面（居中）
+        pdf.addImage(jpgDataUrl, 'JPEG', imgX, imgY, pdfWidth, pdfHeight);
+        pdf.save(`canvas-selection-${Date.now()}.pdf`);
+
+        console.log('PDF export completed successfully');
+      };
+      img.onerror = () => {
+        throw new Error('Failed to load exported image');
+      };
+      img.src = jpgDataUrl;
     } catch (error) {
       console.error('导出 PDF 失败', error);
       window.alert(error instanceof Error ? error.message : '导出 PDF 失败');
